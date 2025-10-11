@@ -18,7 +18,7 @@ export const useDatabase = () => {
       
       // Find the pending request with this ID
       const pendingRequest = pendingRequests.current.get(id);
-      
+
       if (pendingRequest) {
         // Remove the request from the pending list
         pendingRequests.current.delete(id);
@@ -108,7 +108,7 @@ export const useDatabase = () => {
   const getTableList = async () => {
     setIsLoading(true);
     setError(null);
-
+    console.log('get tables list called a::')
     try {
       const result = await sendCommand('getTableList');
       return result.tables || [];

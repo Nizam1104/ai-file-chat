@@ -13,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Settings, Database, Trash2, Table } from "lucide-react";
 import { useDatabase } from "@/hooks/useDatabase";
+import { useTableManager, useDatabaseStore } from "@/stores/database";
 
 interface SettingsDialogProps {
   children: React.ReactNode;
@@ -20,21 +21,17 @@ interface SettingsDialogProps {
 
 export default function SettingsDialog({ children }: SettingsDialogProps) {
   const [open, setOpen] = useState(false);
-  const [existingTables, setExistingTables] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const { isReady, getTableList, deleteDatabase } = useDatabase();
+  const { isReady, deleteDatabase } = useDatabase();
+  const { tables: existingTables, getTables } = useTableManager();
 
   const loadExistingTables = async () => {
     if (!isReady) return;
 
-    setIsLoading(true);
     try {
-      const tables = await getTableList();
-      setExistingTables(tables);
+      await getTables();
     } catch (error) {
       console.error('Error loading existing tables:', error);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -53,7 +50,8 @@ export default function SettingsDialog({ children }: SettingsDialogProps) {
     setIsLoading(true);
     try {
       await deleteDatabase();
-      setExistingTables([]);
+      // Clear tables from store after deletion
+      useDatabaseStore.getState().clearTables();
       alert("Database cleared successfully!");
     } catch (error) {
       console.error('Error clearing database:', error);
@@ -100,7 +98,7 @@ export default function SettingsDialog({ children }: SettingsDialogProps) {
                   {isLoading ? (
                     <div className="flex items-center justify-center py-12">
                       <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                      <span className="ml-2 text-sm text-muted-foreground">Loading tables...</span>
+                      <span className="ml-2 text-sm text-muted-foreground">Processing...</span>
                     </div>
                   ) : existingTables.length > 0 ? (
                     <div className="space-y-4">

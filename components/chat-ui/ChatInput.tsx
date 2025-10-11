@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Upload, Send, Paperclip, X, Database, Plus } from "lucide-react";
 import * as XLSX from "xlsx";
 import { useDatabase } from "@/hooks/useDatabase";
+import { useTableManager } from "@/stores/database";
 import { useAiChatStore } from "@/stores/ai-chat";
 import { saveChatMessage, createChatSession } from "@/actions/client";
 import { Timestamp } from "firebase/firestore";
@@ -28,36 +29,34 @@ export default function ChatInput({ onQueryResults }: ChatInputProps) {
   const [tableName, setTableName] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const [dbStatus, setDbStatus] = useState<string>("");
-  const [existingTables, setExistingTables] = useState<string[]>([]);
   const [isExecutingQuery, setIsExecutingQuery] = useState(false);
-  const { createExcelTable, deleteDatabase, getTableList, getTableData, executeQuery, isReady } = useDatabase();
+  const { createExcelTable, deleteDatabase, getTableData, executeQuery, isReady } = useDatabase();
+  const { tables: existingTables, getTables, refreshTables, hasTables } = useTableManager();
 
   const {
     currentSessionId,
     addMessage,
-    setLoading,
     setError,
     clearChat
   } = useAiChatStore();
 
-  // Check for existing tables when component is ready
-  useEffect(() => {
-    if (isReady) {
-      loadExistingTables();
-    }
-  }, [isReady]);
-
-  const loadExistingTables = async () => {
+  const loadExistingTables = useCallback(async () => {
     try {
-      const tables = await getTableList();
-      setExistingTables(tables);
+      const tables = await getTables();
       if (tables.length > 0) {
         setDbStatus(`📊 Found ${tables.length} existing table(s): ${tables.join(', ')}`);
       }
     } catch (error) {
       console.error('Error loading existing tables:', error);
     }
-  };
+  }, [getTables]);
+
+  // Check for existing tables when component is ready
+  useEffect(() => {
+    if (isReady) {
+      loadExistingTables();
+    }
+  }, [isReady, loadExistingTables]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -70,17 +69,21 @@ export default function ChatInput({ onQueryResults }: ChatInputProps) {
         const data = await file.arrayBuffer();
         const workbook = XLSX.read(data, { type: "array" });
 
-        // Get the first worksheet
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
+        // Initialize an array to hold combined data from all sheets
+        let combinedJsonData: Record<string, unknown>[] = [];
 
-        // Convert worksheet to JSON
-        const jsonData = XLSX.utils.sheet_to_json(worksheet) as Record<string, unknown>[];
+        // Iterate through all sheet names
+        workbook.SheetNames.forEach((sheetName) => {
+          const worksheet = workbook.Sheets[sheetName];
+          const sheetJsonData = XLSX.utils.sheet_to_json(worksheet) as Record<string, unknown>[];
 
-        setExcelData(jsonData);
-        setTableName(sheetName);
+          combinedJsonData = combinedJsonData.concat(sheetJsonData);
+        });
 
-        console.log("Excel data loaded:", jsonData.length, "rows");
+        // Set the combined data and a generic table name
+        setExcelData(combinedJsonData);
+        setTableName('data');
+
       } catch (error) {
         console.error("Error reading Excel file:", error);
       } finally {
@@ -88,6 +91,7 @@ export default function ChatInput({ onQueryResults }: ChatInputProps) {
       }
     }
   };
+
 
   const handleRemoveFile = () => {
     setUploadedFile(null);
@@ -97,7 +101,7 @@ export default function ChatInput({ onQueryResults }: ChatInputProps) {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (message.trim() && existingTables.length > 0) {
+    if (message.trim() && hasTables) {
       // If there's a message and existing tables, generate and execute AI query
       await generateAndExecuteQuery();
     } else if (uploadedFile) {
@@ -116,15 +120,12 @@ export default function ChatInput({ onQueryResults }: ChatInputProps) {
     try {
       // First, clear any existing database
       await deleteDatabase();
-      setDbStatus("📊 Creating new database from Excel file...");
-      console.log(tableName, 'table name ::')
       // Then create the new database with Excel data
       const result = await createExcelTable(tableName || 'excel_data', excelData);
       setDbStatus(`✅ Database table "${result.tableName}" created with ${excelData.length} rows and ${result.columns?.length || 0} columns`);
-      console.log("Database table created:", result);
 
       // Refresh the table list after creation
-      await loadExistingTables();
+      await refreshTables();
     } catch (error) {
       console.error("Error creating database:", error);
       setDbStatus(`❌ Error: ${error}`);
@@ -134,7 +135,7 @@ export default function ChatInput({ onQueryResults }: ChatInputProps) {
   };
 
   const generateAndExecuteQuery = async () => {
-    if (!message.trim() || existingTables.length === 0) return;
+    if (!message.trim() || !hasTables) return;
 
     setIsExecutingQuery(true);
     setDbStatus("🤖 Generating SQL query...");
@@ -206,15 +207,15 @@ export default function ChatInput({ onQueryResults }: ChatInputProps) {
       if (aiData.success) {
         setDbStatus("⚡ Executing query on database...");
 
-        // Save AI query response
-        await saveChatMessage(userId, sessionId, "I've generated a SQL query to help with your request.", aiData.sqlQuery, 'ai');
+        // Save AI query response (only include query if it exists)
+        await saveChatMessage(userId, sessionId, "I've generated a SQL query to help with your request.", aiData.sqlQuery || null, 'ai');
 
         // Add to local state immediately for better UX
         addMessage({
           id: `ai-${Date.now()}`,
           type: 'ai',
           message: "I've generated a SQL query to help with your request.",
-          query: aiData.sqlQuery,
+          query: aiData.sqlQuery || null,
           timestamp: Timestamp.now()
         });
 
@@ -286,7 +287,7 @@ export default function ChatInput({ onQueryResults }: ChatInputProps) {
           <Textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            placeholder={existingTables.length > 0
+            placeholder={hasTables
               ? "Ask questions about your data (e.g., 'Show me all records where amount > 1000')..."
               : "Upload an Excel file first to start asking questions..."}
             className="min-h-[100px] w-full resize-none rounded-lg border-gray-300 dark:border-gray-600 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400"
@@ -300,7 +301,7 @@ export default function ChatInput({ onQueryResults }: ChatInputProps) {
         <div className="flex items-center gap-3">
           <Button
             type="submit"
-            disabled={(!message.trim() && !uploadedFile) || (message.trim() && existingTables.length === 0) || isExecutingQuery}
+            disabled={(!message.trim() && !uploadedFile) || (message.trim() && !hasTables) || isExecutingQuery}
             className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white font-medium rounded-lg transition-colors flex items-center justify-center"
           >
             {isExecutingQuery ? (
@@ -311,7 +312,7 @@ export default function ChatInput({ onQueryResults }: ChatInputProps) {
             ) : (
               <>
                 <Send className="w-4 h-4 mr-2" />
-                {message.trim() && existingTables.length > 0
+                {message.trim() && hasTables
                   ? "Ask AI"
                   : message.trim()
                   ? "Upload Database First"

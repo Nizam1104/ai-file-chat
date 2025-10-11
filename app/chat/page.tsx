@@ -2,10 +2,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import ChatSideBar from "@/components/chat-ui/ChatSideBar"
-import ChatTabs from "@/components/chat-ui/ChatTabs"
+import ChatTabsWrapper from "@/components/chat-ui/ChatTabsWrapper"
 import { Card, CardContent } from "@/components/ui/card";
 import { useAiChatStore } from "@/stores/ai-chat";
 import { getChatSession } from "@/actions/client";
+
+export const dynamic = 'force-dynamic';
 
 export default function DashboardPage() {
   const [queryResults, setQueryResults] = useState<Record<string, unknown>[]>([]);
@@ -64,7 +66,7 @@ export default function DashboardPage() {
         <div className="h-full p-2">
           <Card className="max-w-4xl w-full mx-auto h-full">
             <CardContent className="h-full">
-              <ChatTabs
+              <ChatTabsWrapper
                 queryResults={queryResults}
                 currentQuery={currentQuery}
                 clearResults={clearResults}

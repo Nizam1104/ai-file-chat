@@ -1,6 +1,7 @@
 "use client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { X } from "lucide-react";
 
 interface AIAnalysisProps {
@@ -30,46 +31,37 @@ export default function AIAnalysis({ queryResults, currentQuery, clearResults, c
               </div>
             </CardHeader>
             <CardContent>
-              {currentQuery && (
+              {/* {currentQuery && (
                 <div className="mb-4">
                   <p className="text-sm font-medium mb-2">Generated SQL:</p>
                   <div className="bg-gray-100 dark:bg-gray-800 rounded p-3 font-mono text-sm">
                     {currentQuery}
                   </div>
                 </div>
-              )}
-              <div className="overflow-x-auto">
-                <table className="min-w-full">
-                  <thead>
-                    <tr className="bg-gray-100 dark:bg-gray-700">
+              )} */}
+              <div className="overflow-x-auto max-h-[480px]">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
                       {Object.keys(queryResults[0]).map((column) => (
-                        <th
-                          key={column}
-                          className="px-4 py-2 text-left font-medium text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600"
-                        >
+                        <TableHead key={column}>
                           {column}
-                        </th>
+                        </TableHead>
                       ))}
-                    </tr>
-                  </thead>
-                  <tbody>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {queryResults.slice(0, 20).map((row, index) => (
-                      <tr
-                        key={index}
-                        className={index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-750'}
-                      >
+                      <TableRow key={index}>
                         {Object.keys(row).map((column) => (
-                          <td
-                            key={column}
-                            className="px-4 py-2 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-600"
-                          >
+                          <TableCell key={column}>
                             {row[column]?.toString() || ''}
-                          </td>
+                          </TableCell>
                         ))}
-                      </tr>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
                 {queryResults.length > 20 && (
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 text-center">
                     Showing first 20 of {queryResults.length} results

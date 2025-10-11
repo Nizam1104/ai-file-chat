@@ -5,26 +5,27 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from "@/components/ui/table";
 import { Database, RefreshCw } from "lucide-react";
 import { useDatabase } from "@/hooks/useDatabase";
+import { useTableManager } from "@/stores/database";
 
 interface FileDataTableProps {
   className?: string;
+  isActive?: boolean;
 }
 
-export default function FileDataTable({ className }: FileDataTableProps) {
+export default function FileDataTable({ className, isActive = true }: FileDataTableProps) {
   const [dbData, setDbData] = useState<Record<string, unknown>[]>([]);
-  const [existingTables, setExistingTables] = useState<string[]>([]);
   const [isDataLoading, setIsDataLoading] = useState(false);
   const [dataError, setDataError] = useState<string | null>(null);
-  const { getTableList, getTableData, isReady } = useDatabase();
-  const hasLoadedData = useRef(false);
-
+  const { getTableData, isReady } = useDatabase();
+  const { tables: existingTables, getTables, hasTables } = useTableManager();
+  const hasLoadedInitialData = useRef(false);
+  
   const loadDatabaseData = useCallback(async () => {
     setIsDataLoading(true);
     setDataError(null);
 
     try {
-      const tables = await getTableList();
-      setExistingTables(tables);
+      const tables = await getTables();
 
       if (tables.length > 0) {
         // Get data from the first available table
@@ -46,14 +47,20 @@ export default function FileDataTable({ className }: FileDataTableProps) {
     } finally {
       setIsDataLoading(false);
     }
-  }, []);
+  }, [getTables, getTableData]);
 
   useEffect(() => {
-    if (isReady && !hasLoadedData.current) {
-      hasLoadedData.current = true;
+    if (isReady && !hasLoadedInitialData.current) {
+      hasLoadedInitialData.current = true;
       loadDatabaseData();
     }
   }, [isReady, loadDatabaseData]);
+
+  useEffect(() => {
+    if (isActive && isReady && hasLoadedInitialData.current && dbData.length === 0) {
+      loadDatabaseData();
+    }
+  }, [isActive, isReady, dbData.length, loadDatabaseData]);
 
   return (
     <div className={className}>
@@ -128,7 +135,7 @@ export default function FileDataTable({ className }: FileDataTableProps) {
             </CardContent>
           </Card>
         </div>
-      ) : existingTables.length === 0 ? (
+      ) : !hasTables ? (
         <div className="flex items-center justify-center h-64">
           <div className="text-center space-y-3">
             <Database className="w-12 h-12 text-gray-400 mx-auto" />

@@ -24,12 +24,13 @@ export async function POST(request: NextRequest) {
 
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
-    const systemPrompt = `You are an SQL query generator. Generate a JSON response with the SQL query.
+    const systemPrompt = `You are an SQLite query generator. Generate a JSON response with the SQL query.
 
 Table Schema:
 ${JSON.stringify(tableSchema, null, 2)}
 
 Rules:
+- Generate proper SQLite queries that works
 - Generate ONLY standard SQL SELECT queries
 - Use appropriate WHERE clauses for filtering
 - Use ORDER BY when sorting is needed
@@ -55,8 +56,6 @@ Respond with ONLY the JSON object starting with { and ending with }`;
     const result = await model.generateContent(systemPrompt);
     let responseText = result.response.text().trim();
 
-    console.log('Raw response:', responseText);
-
     // Remove markdown code blocks if present
     if (responseText.startsWith('```')) {
       const firstNewline = responseText.indexOf('\n');
@@ -73,7 +72,7 @@ Respond with ONLY the JSON object starting with { and ending with }`;
 
     responseText = responseText.trim();
 
-    console.log('Cleaned response:', responseText);
+    // console.log('response', responseText)
 
     try {
       // Parse JSON response

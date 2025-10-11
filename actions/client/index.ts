@@ -34,7 +34,7 @@ export async function saveChatMessage(
       id: messageRef.id,
       type,
       message,
-      query,
+      ...(query && { query }),
       timestamp: Timestamp.now()
     };
 
@@ -54,7 +54,7 @@ export async function saveChatMessage(
     return { success: true, messageId: messageRef.id };
   } catch (error) {
     console.error('Error saving chat message:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }
 
@@ -75,7 +75,7 @@ export async function createChatSession(userId: string, title: string) {
     return { success: true, sessionId };
   } catch (error) {
     console.error('Error creating chat session:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }
 
@@ -109,7 +109,7 @@ export async function getChatSession(userId: string, sessionId: string) {
     };
   } catch (error) {
     console.error('Error getting chat session:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }
 
@@ -130,6 +130,6 @@ export async function getUserChatSessions(userId: string, limit: number = 20) {
     return { success: true, sessions };
   } catch (error) {
     console.error('Error getting user chat sessions:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }
