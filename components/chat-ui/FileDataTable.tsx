@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from "@/components/ui/table";
-import { Database, RefreshCw } from "lucide-react";
+import { Database, RefreshCw, AlertCircle } from "lucide-react";
 import { useDatabase } from "@/hooks/useDatabase";
 import { useTableManager } from "@/stores/database";
 
@@ -16,15 +16,24 @@ export default function FileDataTable({ className, isActive = true }: FileDataTa
   const [dbData, setDbData] = useState<Record<string, unknown>[]>([]);
   const [isDataLoading, setIsDataLoading] = useState(false);
   const [dataError, setDataError] = useState<string | null>(null);
-  const { getTableData, isReady } = useDatabase();
-  const { tables: existingTables, getTables, hasTables } = useTableManager();
+  const {
+    getTableData,
+    isReady,
+    isLoading: dbLoading,
+    error: dbError,
+    initStatus,
+    retry,
+    forceReinit
+  } = useDatabase();
+  const { tables: existingTables, getTables, hasTables, isLoading: tablesLoading } = useTableManager();
   const hasLoadedInitialData = useRef(false);
-  
+
   const loadDatabaseData = useCallback(async () => {
     setIsDataLoading(true);
     setDataError(null);
 
     try {
+      // First ensure we have the latest table list
       const tables = await getTables();
 
       if (tables.length > 0) {
@@ -49,6 +58,7 @@ export default function FileDataTable({ className, isActive = true }: FileDataTa
     }
   }, [getTables, getTableData]);
 
+  // Auto-initialize and load data when database becomes ready
   useEffect(() => {
     if (isReady && !hasLoadedInitialData.current) {
       hasLoadedInitialData.current = true;
@@ -56,30 +66,54 @@ export default function FileDataTable({ className, isActive = true }: FileDataTa
     }
   }, [isReady, loadDatabaseData]);
 
+  // Reload data when component becomes active and no data exists
   useEffect(() => {
-    if (isActive && isReady && hasLoadedInitialData.current && dbData.length === 0) {
+    if (isActive && isReady && hasLoadedInitialData.current && dbData.length === 0 && !dataError) {
       loadDatabaseData();
     }
-  }, [isActive, isReady, dbData.length, loadDatabaseData]);
+  }, [isActive, isReady, dbData.length, dataError, loadDatabaseData]);
+
+  // Calculate overall loading state
+  const isLoading = dbLoading || tablesLoading || isDataLoading;
 
   return (
     <div className={className}>
-      {isDataLoading ? (
+      {initStatus === 'initializing' || isLoading ? (
         <div className="flex items-center justify-center h-64">
           <div className="flex flex-col items-center space-y-3">
             <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-muted-foreground">Loading database data...</p>
+            <p className="text-muted-foreground">
+              {initStatus === 'initializing' ? 'Initializing database...' : 'Loading data...'}
+            </p>
           </div>
         </div>
-      ) : dataError ? (
+      ) : initStatus === 'error' || dataError || dbError ? (
         <div className="flex items-center justify-center h-64">
-          <div className="text-center space-y-3">
-            <p className="text-red-500">Error loading database data</p>
-            <p className="text-sm text-gray-500">{dataError}</p>
-            <Button onClick={loadDatabaseData} variant="outline" size="sm">
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Retry
-            </Button>
+          <div className="text-center space-y-3 max-w-md mx-auto px-4">
+            <AlertCircle className="w-12 h-12 text-red-500 mx-auto" />
+            <div>
+              <p className="text-red-500 font-medium">Database Error</p>
+              <p className="text-sm text-gray-600 mt-1">
+                {dataError || dbError || 'Unknown database error occurred'}
+              </p>
+              {initStatus === 'error' && (
+                <p className="text-xs text-gray-500 mt-2">
+                  Status: Database initialization failed
+                </p>
+              )}
+            </div>
+            <div className="flex gap-2 justify-center">
+              <Button onClick={loadDatabaseData} variant="outline" size="sm">
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Retry Data
+              </Button>
+              {initStatus === 'error' && (
+                <Button onClick={retry} variant="outline" size="sm">
+                  <Database className="w-4 h-4 mr-2" />
+                  Retry Connection
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       ) : dbData.length > 0 ? (
@@ -95,15 +129,42 @@ export default function FileDataTable({ className, isActive = true }: FileDataTa
                       ({existingTables[0]})
                     </span>
                   )}
+                  {/* Connection status indicator */}
+                  <div className="flex items-center gap-1">
+                    <div className={`w-2 h-2 rounded-full ${
+                      initStatus === 'ready' ? 'bg-green-500' :
+                      initStatus === 'initializing' ? 'bg-yellow-500 animate-pulse' :
+                      'bg-red-500'
+                    }`} />
+                    <span className="text-xs text-gray-500">
+                      {initStatus === 'ready' ? 'Connected' :
+                       initStatus === 'initializing' ? 'Connecting...' :
+                       'Disconnected'}
+                    </span>
+                  </div>
                 </div>
-                <Button
-                  onClick={loadDatabaseData}
-                  variant="ghost"
-                  size="sm"
-                  className="text-xs"
-                >
-                  <RefreshCw className="w-4 h-4 mr-1" />
-                </Button>
+                <div className="flex gap-1">
+                  <Button
+                    onClick={loadDatabaseData}
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs"
+                    title="Refresh data"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-1" />
+                  </Button>
+                  {initStatus !== 'ready' && (
+                    <Button
+                      onClick={forceReinit}
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs text-orange-500"
+                      title="Reconnect database"
+                    >
+                      <Database className="w-4 h-4 mr-1" />
+                    </Button>
+                  )}
+                </div>
               </div>
             </CardHeader>
             <CardContent>
