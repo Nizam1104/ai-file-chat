@@ -18,7 +18,7 @@ interface AiChatState {
   clearChat: () => void;
 }
 
-export const useAiChatStore = create<AiChatState>((set, get) => ({
+export const useAiChatStore = create<AiChatState>((set) => ({
   // Initial state
   currentSessionId: null,
   currentSession: null,

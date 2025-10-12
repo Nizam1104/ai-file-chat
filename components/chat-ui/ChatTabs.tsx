@@ -5,13 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AIAnalysis from "./AIAnalysis";
 import Charts from "../charts/Charts";
 
-interface ChatTabsProps {
-  queryResults: Record<string, unknown>[];
-  currentQuery: string;
-  clearResults: () => void;
-}
-
-export default function ChatTabs({ queryResults, currentQuery, clearResults }: ChatTabsProps) {
+export default function ChatTabs() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<string>("ai-analyse");
@@ -36,12 +30,8 @@ export default function ChatTabs({ queryResults, currentQuery, clearResults }: C
         <TabsTrigger value="ai-analyse">AI Analyse</TabsTrigger>
         <TabsTrigger value="charts">Charts</TabsTrigger>
       </TabsList>
-            <TabsContent value="ai-analyse" className="mt-6 h-full">
-        <AIAnalysis
-          queryResults={queryResults}
-          currentQuery={currentQuery}
-          clearResults={clearResults}
-        />
+      <TabsContent value="ai-analyse" className="mt-6 h-full">
+        <AIAnalysis />
       </TabsContent>
       <TabsContent value="charts" className="mt-6 h-full">
         <Charts />

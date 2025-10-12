@@ -1,6 +1,6 @@
 "use client"
-import { useState, useEffect, useCallback } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import ChatSideBar from "@/components/chat-ui/ChatSideBar"
 import ChatTabsWrapper from "@/components/chat-ui/ChatTabsWrapper"
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,10 +10,7 @@ import { getChatSession } from "@/actions/client";
 export const dynamic = 'force-dynamic';
 
 export default function DashboardPage() {
-  const [queryResults, setQueryResults] = useState<Record<string, unknown>[]>([]);
-  const [currentQuery, setCurrentQuery] = useState<string>("");
   const searchParams = useSearchParams();
-  const router = useRouter();
 
   const {
     setCurrentSessionId,
@@ -50,32 +47,18 @@ export default function DashboardPage() {
     }
   }, [searchParams, loadChatSession]);
 
-  const handleQueryResults = (results: Record<string, unknown>[], query: string) => {
-    setQueryResults(results);
-    setCurrentQuery(query);
-  };
-
-  const clearResults = () => {
-    setQueryResults([]);
-    setCurrentQuery("");
-  };
-
   return (
     <div className="flex w-full min-h-screen">
       <div className="flex-1">
         <div className="h-full p-2">
           <Card className="max-w-4xl w-full mx-auto h-full">
             <CardContent className="h-full">
-              <ChatTabsWrapper
-                queryResults={queryResults}
-                currentQuery={currentQuery}
-                clearResults={clearResults}
-              />
+              <ChatTabsWrapper />
             </CardContent>
           </Card>
         </div>
       </div>
-      <ChatSideBar onQueryResults={handleQueryResults} />
+      <ChatSideBar />
     </div>
   )
 }

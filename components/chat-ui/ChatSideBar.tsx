@@ -4,11 +4,7 @@
 import ChatInput from "./ChatInput";
 import ChatMessages from "./ChatMessages";
 
-interface ChatSideBarProps {
-  onQueryResults?: (results: Record<string, unknown>[], query: string) => void;
-}
-
-export default function ChatSideBar({ onQueryResults }: ChatSideBarProps) {
+export default function ChatSideBar() {
   return (
     <div className="h-screen w-80 border-l flex flex-col relative">
       {/* Chat Messages - takes remaining space */}
@@ -16,7 +12,7 @@ export default function ChatSideBar({ onQueryResults }: ChatSideBarProps) {
 
       {/* Chat Input - fixed at bottom */}
       <div className="w-full">
-        <ChatInput onQueryResults={onQueryResults} />
+        <ChatInput />
       </div>
     </div>
   )
