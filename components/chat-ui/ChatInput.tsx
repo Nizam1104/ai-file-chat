@@ -70,19 +70,78 @@ export default function ChatInput({ onQueryResults }: ChatInputProps) {
         const workbook = XLSX.read(data, { type: "array" });
 
         // Initialize an array to hold combined data from all sheets
-        let combinedJsonData: Record<string, unknown>[] = [];
+        const combinedJsonData: Record<string, unknown>[] = [];
 
-        // Iterate through all sheet names
+        // Get all sheets data
+        const sheetsData: Record<string, Record<string, unknown>[]> = {};
         workbook.SheetNames.forEach((sheetName) => {
           const worksheet = workbook.Sheets[sheetName];
-          const sheetJsonData = XLSX.utils.sheet_to_json(worksheet) as Record<string, unknown>[];
-
-          combinedJsonData = combinedJsonData.concat(sheetJsonData);
+          sheetsData[sheetName] = XLSX.utils.sheet_to_json(worksheet) as Record<string, unknown>[];
         });
 
-        // Set the combined data and a generic table name
+        if (workbook.SheetNames.length > 0) {
+          // Find the sheet with the most rows to use as the base
+          const maxRowsSheet = workbook.SheetNames.reduce((maxSheet, currentSheet) =>
+            sheetsData[currentSheet].length > sheetsData[maxSheet].length ? currentSheet : maxSheet
+          );
+
+          const maxRows = sheetsData[maxRowsSheet].length;
+
+          // Create horizontal merge by combining columns from all sheets
+          for (let rowIndex = 0; rowIndex < maxRows; rowIndex++) {
+            const combinedRow: Record<string, unknown> = {};
+
+            // Add columns from each sheet for this row
+            workbook.SheetNames.forEach((sheetName) => {
+              const sheetData = sheetsData[sheetName];
+              const row = sheetData[rowIndex];
+
+              if (row) {
+                // Add prefix to column names to avoid conflicts
+                Object.keys(row).forEach(colName => {
+                  const prefixedColName = sheetName === workbook.SheetNames[0]
+                    ? colName // First sheet columns keep original names
+                    : `${sheetName}_${colName}`; // Other sheets get prefixed column names
+                  combinedRow[prefixedColName] = row[colName];
+                });
+              } else {
+                // If this sheet doesn't have this row, add empty values for its columns
+                if (sheetData.length > 0) {
+                  Object.keys(sheetData[0]).forEach(colName => {
+                    const prefixedColName = sheetName === workbook.SheetNames[0]
+                      ? colName
+                      : `${sheetName}_${colName}`;
+                    combinedRow[prefixedColName] = '';
+                  });
+                }
+              }
+            });
+
+            combinedJsonData.push(combinedRow);
+          }
+        }
+
+        // Create a new workbook with a single worksheet containing the combined data
+        const newWorkbook = XLSX.utils.book_new();
+        const newWorksheet = XLSX.utils.json_to_sheet(combinedJsonData);
+        XLSX.utils.book_append_sheet(newWorkbook, newWorksheet, "Combined_Data");
+
+        // Convert the new workbook to a blob and create a new File object
+        const newWorkbookBuffer = XLSX.write(newWorkbook, { type: "array", bookType: "xlsx" });
+        const newBlob = new Blob([newWorkbookBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+        const newFileName = `${file.name.replace(/\.[^/.]+$/, "")}_combined.xlsx`;
+        const newFile = new File([newBlob], newFileName, { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+
+        // Update the uploaded file to be the new combined file
+        setUploadedFile(newFile);
+
+        // Set the combined data and generate a descriptive table name
+        console.log(combinedJsonData)
         setExcelData(combinedJsonData);
-        setTableName('data');
+
+        // Generate a more descriptive table name based on the file name
+        const baseTableName = newFileName.replace(/\.[^/.]+$/, "").replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
+        setTableName(baseTableName || 'combined_data');
 
       } catch (error) {
         console.error("Error reading Excel file:", error);
@@ -120,9 +179,15 @@ export default function ChatInput({ onQueryResults }: ChatInputProps) {
     try {
       // First, clear any existing database
       await deleteDatabase();
-      // Then create the new database with Excel data
-      const result = await createExcelTable(tableName || 'excel_data', excelData);
-      setDbStatus(`✅ Database table "${result.tableName}" created with ${excelData.length} rows and ${result.columns?.length || 0} columns`);
+
+      // Then create the new database with combined Excel data
+      const result = await createExcelTable(tableName || 'combined_data', excelData);
+
+      // Get unique sheets count from the data (if _source_sheet exists)
+      const uniqueSheets = new Set(excelData.map(row => row._source_sheet)).size;
+      const sheetInfo = uniqueSheets > 1 ? ` from ${uniqueSheets} worksheets` : '';
+
+      setDbStatus(`✅ Database table "${result.tableName}" created with ${excelData.length} combined rows${sheetInfo} and ${result.columns?.length || 0} columns`);
 
       // Refresh the table list after creation
       await refreshTables();
@@ -363,7 +428,7 @@ export default function ChatInput({ onQueryResults }: ChatInputProps) {
               </span>
               {excelData.length > 0 && (
                 <span className="text-xs text-green-600 dark:text-green-400">
-                  ({excelData.length} rows)
+                  ({excelData.length} combined rows)
                 </span>
               )}
             </div>
@@ -385,7 +450,7 @@ export default function ChatInput({ onQueryResults }: ChatInputProps) {
               size="sm"
             >
               <Database className="w-4 h-4 mr-2" />
-              {isLoading ? 'Creating Database...' : `Create Database (${excelData.length} rows)`}
+              {isLoading ? 'Creating Database...' : `Create Combined Database (${excelData.length} rows)`}
             </Button>
           )}
 

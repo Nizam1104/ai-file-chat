@@ -57,7 +57,6 @@ export const useDatabase = () => {
 
         // Handle worker termination (this can happen when switching tabs)
         worker.onmessageerror = (e) => {
-          console.log('Worker message error detected:', e);
           // This might indicate the worker was terminated, trigger reconnection
           setInitStatus('idle');
           setError(null);
