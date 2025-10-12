@@ -2,7 +2,6 @@
 
 // Initialize the database
 function initDatabase() {
-    console.log('init db called');
     return new Promise((resolve, reject) => {
         // Check if we already have a database in IndexedDB
         const openRequest = indexedDB.open('SQLiteDB', 1);

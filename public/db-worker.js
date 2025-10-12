@@ -1,7 +1,6 @@
 // This is the worker code that will be running in a separate thread
 let db;
-let isInitialized = false;
-let isInitializing = false;
+let initPromise;
 
 // Import modules
 importScripts('/sql-wasm.js');
@@ -11,62 +10,53 @@ importScripts('/sqljs/actions/getTableData.js');
 importScripts('/sqljs/actions/getTableList.js');
 importScripts('/sqljs/actions/deleteDb.js');
 importScripts('/sqljs/actions/executeQuery.js');
+importScripts('/sqljs/actions/getFirstNRows.js');
 
+// Initialize database once
+async function getDatabase() {
+    if (!initPromise) {
+        initPromise = initDatabase().then(database => {
+            db = database;
+            return db;
+        });
+    }
+    return initPromise;
+}
 
 // Handle messages from the main thread
 self.onmessage = async (e) => {
     const { id, command, data } = e.data;
 
     try {
-        // Wait for initialization if it's already in progress
-        if (!isInitialized) {
-            if (isInitializing) {
-                // If already initializing, wait for it to complete
-                while (isInitializing) {
-                    await new Promise(resolve => setTimeout(resolve, 50));
-                }
-            } else {
-                // Start initialization if not already done
-                console.log('Starting database initialization');
-                isInitializing = true;
-                try {
-                    db = await initDatabase();
-                    isInitialized = true;
-                    console.log('Database initialization completed');
-                } catch (error) {
-                    console.error('Database initialization failed:', error);
-                    throw error;
-                } finally {
-                    isInitializing = false;
-                }
-            }
-        }
-
+        const database = await getDatabase();
         let result;
 
         // Route commands to appropriate action modules
         switch (command) {
             case 'createExcelTable':
-                result = await createExcelTable(db, data, () => saveDatabase(db));
+                result = await createExcelTable(database, data, () => saveDatabase(database));
                 break;
 
             case 'getTableData':
-                result = await getTableData(db, data);
+                result = await getTableData(database, data);
                 break;
 
             case 'getTableList':
-                result = await getTableList(db);
+                result = await getTableList(database);
                 break;
 
             case 'deleteDb':
-                isInitialized = false;
-                result = await deleteDb(db, initDatabase);
+                initPromise = null; // Reset init promise
+                result = await deleteDb(database, initDatabase);
                 db = await initDatabase(); // Reinitialize after deletion
-                isInitialized = true;
                 break;
 
             case 'executeQuery':
-                result = await executeQuery(db, data);
+                result = await executeQuery(database, data);
+                break;
+
+            case 'getFirstNRows':
+                result = await getFirstNRows(database, data);
                 break;
 
             default:

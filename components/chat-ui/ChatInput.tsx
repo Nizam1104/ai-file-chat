@@ -136,7 +136,6 @@ export default function ChatInput({ onQueryResults }: ChatInputProps) {
         setUploadedFile(newFile);
 
         // Set the combined data and generate a descriptive table name
-        console.log(combinedJsonData)
         setExcelData(combinedJsonData);
 
         // Generate a more descriptive table name based on the file name

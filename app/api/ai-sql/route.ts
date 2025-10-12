@@ -72,8 +72,6 @@ Respond with ONLY the JSON object starting with { and ending with }`;
 
     responseText = responseText.trim();
 
-    // console.log('response', responseText)
-
     try {
       // Parse JSON response
       const jsonResponse = JSON.parse(responseText);

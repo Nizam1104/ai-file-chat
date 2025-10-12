@@ -29,7 +29,6 @@ function createExcelTable(db, data, saveDatabase) {
 
             // Create table with quoted table name
             const createTableSQL = `CREATE TABLE "${safeTableName}" (${columnDefinitions})`;
-            console.log('Creating table with SQL:', createTableSQL);
             db.run(createTableSQL);
 
             // Prepare insert statement with both table and column names properly quoted
